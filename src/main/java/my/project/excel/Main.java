@@ -11,6 +11,7 @@ import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.streaming.SXSSFWorkbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 public class Main {
@@ -21,12 +22,13 @@ public class Main {
 			System.out.println("Started");
 			File inputFile = new File(Constants.FILE_INPUT_PATH);
 			File ouputFile = new File(Constants.FILE_OUPUT_PATH);
-			// file.createNewFile();
 
 			Workbook workbook = new XSSFWorkbook(inputFile);
 			Sheet spreadsheet = workbook.getSheet(Constants.SHEET_MAIN_NAME);
 
-			Workbook outputWorkbook = new XSSFWorkbook();
+			// keep 100 rows in memory, exceeding rows will be flushed to disk;
+			Workbook outputWorkbook = new SXSSFWorkbook(100);
+
 			Sheet outputSheet = outputWorkbook
 					.createSheet(Constants.SHEET_OUTPUT_NAME);
 
@@ -49,7 +51,7 @@ public class Main {
 				}
 			}
 			outputWorkbook.write(new FileOutputStream(ouputFile));
-
+			((SXSSFWorkbook) outputWorkbook).dispose();
 			outputWorkbook.close();
 			workbook.close();
 

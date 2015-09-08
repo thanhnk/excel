@@ -4,7 +4,6 @@ import java.util.Date;
 
 import my.project.excel.processor.Processor;
 
-import org.apache.poi.ss.usermodel.Cell;
 import org.jboss.weld.environment.se.Weld;
 import org.jboss.weld.environment.se.WeldContainer;
 
@@ -33,18 +32,5 @@ public class Main {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-	}
-
-	private static String getCellStringValue(Cell cell) {
-		String value = "";
-		switch (cell.getCellType()) {
-		case Cell.CELL_TYPE_NUMERIC:
-			value = cell.getNumericCellValue() + "";
-			break;
-		case Cell.CELL_TYPE_STRING:
-			value = cell.getStringCellValue();
-			break;
-		}
-		return value;
 	}
 }

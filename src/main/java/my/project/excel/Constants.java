@@ -11,4 +11,6 @@ public class Constants {
 
 	public final static String SHEET_MAIN_NAME = "Education";
 	public final static String SHEET_OUTPUT_NAME = "Achievements";
+
+	public final static int MAX_ROW_NUMBER_EXCEL = 1048575;
 }

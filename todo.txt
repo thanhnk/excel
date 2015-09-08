@@ -1,0 +1,6 @@
+2015.09.06
+- Confirm requirement
+- Study Java GUI API.
+- Implement GUI
+ + Asynchronous loading excel file
+ + Provide progressing bar

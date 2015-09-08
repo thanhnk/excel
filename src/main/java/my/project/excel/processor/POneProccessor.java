@@ -22,15 +22,19 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 public class POneProccessor implements Processor {
 	private String inputFile;
-	private String outputFile;
+	private String outputFileName;
+	private String outputFileExtension;
 	private boolean inited = false;
 	private boolean isHugeFile;
 	private List<Director> directors;
+	private int outputRowOrder;
+	private Sheet currentSheet;
+	private Workbook outputWorkbook;
+	private String startRow;
+	private String endRow;
 
 	@Inject
 	private Logger logger;
-
-	private int limitedSimilarDirectors = 100;
 
 	public final static String[] OUTPUT_HEADER = { "Director ID",
 			"Connected ID", "Company ID" };
@@ -40,13 +44,14 @@ public class POneProccessor implements Processor {
 			throws Exception {
 		logger.info("Start init()");
 		this.inputFile = inputFile;
-		this.outputFile = outputFile;
+		this.outputFileName = outputFile.substring(0,
+				outputFile.indexOf(".xlsx"));
+		this.outputFileExtension = ".xlsx";
 		this.isHugeFile = isHugeFile;
-		load();
+		loadData();
 		inited = true;
 		logger.info("Imported " + directors.size() + " directors");
 		logger.info("End init()");
-
 	}
 
 	@Override
@@ -56,28 +61,31 @@ public class POneProccessor implements Processor {
 			throw new Exception("The proccessor.init() need to call first");
 		}
 
-		Workbook outputWorkbook = null;
 		try {
-			if (isHugeFile) {
-				// keep 100 rows in memory, exceeding rows will be flushed to
-				// disk;
-				outputWorkbook = new SXSSFWorkbook(100);
-				// outputWorkbook.setCompressTempFiles(true);
-			} else {
-				outputWorkbook = new XSSFWorkbook();
-			}
-			Sheet outputSheet = outputWorkbook
-					.createSheet(Constants.SHEET_OUTPUT_NAME);
-			generateHeader(outputSheet);
-			int rowOrder = 1;
+			generateNewOutput();
+			int directorOrder = 1;
 			for (Director director : directors) {
-				processRow(director, outputSheet, rowOrder++);
+				if (StringUtils.isEmpty(startRow)) {
+					startRow = "" + directorOrder;
+				}
+				endRow = "" + directorOrder;
+				processDirector(director);
+				logger.info("Processed row " + directorOrder++);
 			}
-			outputSheet.setColumnWidth(0, 5000);
-			outputSheet.setColumnWidth(2, 5000);
-			outputSheet.setColumnWidth(1, 15000);
+			saveToFile();
+		} catch (Exception e) {
+			throw e;
+		}
+		logger.info("End process");
+	}
 
-			outputWorkbook.write(new FileOutputStream(new File(outputFile)));
+	private void saveToFile() throws Exception {
+
+		try {
+			String fileName = outputFileName + "_" + startRow + "_" + endRow
+					+ outputFileExtension;
+			outputWorkbook.write(new FileOutputStream(new File(fileName)));
+			logger.info("Saved file:" + fileName);
 		} catch (Exception e) {
 			throw e;
 		} finally {
@@ -86,32 +94,44 @@ public class POneProccessor implements Processor {
 					((SXSSFWorkbook) outputWorkbook).dispose();
 				}
 				outputWorkbook.close();
+				outputWorkbook = null;
 			}
 			logger.info("End process");
 		}
 	}
 
-	private void processRow(Director director, Sheet sheet, int rowOrder)
-			throws Exception {
-		List<String> similarDirectors = new ArrayList<String>();
-		int countSimilarDirector = 0;
+	private void generateNewOutput() throws Exception {
+		if (isHugeFile) {
+			// keep 100 rows in memory, exceeding rows will be flushed to
+			// disk;
+			outputWorkbook = new SXSSFWorkbook(100);
+			// outputWorkbook.setCompressTempFiles(true);
+		} else {
+			outputWorkbook = new XSSFWorkbook();
+		}
+		currentSheet = outputWorkbook.createSheet(Constants.SHEET_OUTPUT_NAME);
+		generateHeader(currentSheet);
+		currentSheet.setColumnWidth(0, 5000);
+		currentSheet.setColumnWidth(2, 5000);
+		currentSheet.setColumnWidth(1, 5000);
+		outputRowOrder = 1;
+		startRow = "";
+		endRow = "";
+	}
+
+	private void processDirector(Director director) throws Exception {
 		for (Director otherDirector : directors) {
 			if (isSameCompany(director, otherDirector)) {
-				similarDirectors.add(otherDirector.getDirectorId());
-				countSimilarDirector++;
-				if (countSimilarDirector > limitedSimilarDirectors) {
-					logger.warning("Too many directors with the same company: "
-							+ String.join(", ", similarDirectors));
-					break;
+				String[] ouputData = { director.getDirectorId(),
+						otherDirector.getDirectorId(), director.getCompanyId() };
+				DataUtil.generateRow(ouputData, currentSheet, outputRowOrder++);
+				if (outputRowOrder >= Constants.MAX_ROW_NUMBER_EXCEL) {
+					saveToFile();
+					generateNewOutput();
 				}
 			}
-		}
-		String[] ouputData = { director.getDirectorId(),
-				String.join(", ", similarDirectors), director.getCompanyId() };
 
-		DataUtil.generateRow(ouputData, sheet, rowOrder);
-		logger.info("Generated row " + rowOrder + ":"
-				+ String.join("|", ouputData));
+		}
 	}
 
 	private boolean isSameCompany(Director director1, Director director2) {
@@ -125,17 +145,19 @@ public class POneProccessor implements Processor {
 		DataUtil.generateRow(OUTPUT_HEADER, sheet, headerRowOrder);
 	}
 
-	private void load() throws Exception {
+	private void loadData() throws Exception {
 		Workbook inputWorkbook = new XSSFWorkbook(new File(inputFile));
 		Sheet inputSheet = inputWorkbook.getSheet(Constants.SHEET_MAIN_NAME);
 		inputSheet.removeRow(inputSheet.getRow(0)); // remove header line
 		directors = new ArrayList<Director>(inputSheet.getLastRowNum());
 		Iterator<Row> rows = inputSheet.iterator();
 		Director director = null;
+		int rowOrder = 1;
+		logger.info("Start loading file");
 		while (rows.hasNext()) {
 			director = DataUtil.map(rows.next());
 			directors.add(director);
-			logger.info("Imported:" + director);
+			logger.info("Imported row " + (rowOrder++) + ":" + director);
 		}
 		inputWorkbook.close();
 	}
